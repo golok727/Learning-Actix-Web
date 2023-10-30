@@ -1,18 +1,18 @@
+use std::hash;
+
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use env_logger::Env;
-use std::sync::Mutex;
 
 use surrealdb::engine::remote::ws::Ws;
 use surrealdb::opt::auth::Root;
-use surrealdb::sql::Thing;
 use surrealdb::Surreal;
 
 mod api;
+mod utils;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     println!("Radhey Shyam");
-
     // Initialize Logger
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
@@ -39,10 +39,7 @@ async fn main() -> std::io::Result<()> {
         .map_err(|err| println!("Database Connection Error: \n {}", err))
         .unwrap();
 
-    println!("Using Surreal DB...: {:#?}", db.version());
-
     // setup the database in the state
-    let ctx = web::Data::new(api::app_state::AppContext { db: Mutex::new(db) });
 
     HttpServer::new(move || {
         let api_scope = web::scope("/api")
@@ -51,7 +48,7 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .wrap(Logger::default())
-            .app_data(ctx.clone())
+            .app_data(web::Data::new(db.clone()))
             .service(api_scope)
     })
     .bind(("127.0.0.1", 8080))?
