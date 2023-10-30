@@ -9,7 +9,8 @@ use super::models;
 mod route_sign_in {
     #[derive(super::Serialize, super::Deserialize, Debug)]
     pub struct SignInBody {
-        pub email_id: String,
+        pub email_id: Option<String>,
+        pub username: Option<String>,
         pub password: String,
     }
 }
@@ -24,14 +25,33 @@ mod route_sign_up {
         pub password: String,
         pub first_name: String,
         pub last_name: String,
-        pub age: i8,
+        pub age: u8,
         pub gender: user::Gender,
+    }
+
+    #[derive(super::Serialize)]
+    pub struct UserResponse<'a> {
+        pub username: &'a str,
+        pub email_id: &'a str,
+        pub first_name: &'a str,
+        pub last_name: &'a str,
+        pub age: u8,
+        pub gender: user::Gender,
+    }
+
+    #[derive(super::Serialize)]
+    pub struct SignUpResponse<'a> {
+        pub status: u8,
+        pub message: &'a str,
+        pub new_user: UserResponse<'a>,
     }
 }
 
 #[post("/signin")]
 pub async fn sign_in(body: web::Json<route_sign_in::SignInBody>) -> HttpResponse {
     dbg!(body);
+    // Allow to sign in with both username or email
+
     HttpResponse::Ok().body("SignIn")
 }
 
@@ -40,14 +60,28 @@ pub async fn sign_up(
     body: web::Json<route_sign_up::SignUpBody>,
     db: web::Data<Surreal<Client>>,
 ) -> HttpResponse {
-    dbg!(&body);
-
     let username = &body.username;
     let email_id = &body.email_id;
     let password = &body.password;
     let first_name = &body.first_name;
     let last_name = &body.last_name;
     let gender: &models::user::Gender = &body.gender;
+
+    // check if email already exists;
+    let db_user = models::user::UserRecord::find_one_by_email(&db, email_id)
+        .await
+        .map_err(|err| {
+            HttpResponse::InternalServerError()
+                .body(format!("Something went wrong\n Error: {}", err))
+        })
+        .unwrap();
+
+    if Option::is_some(&db_user) {
+        return HttpResponse::BadRequest().body(format!(
+            "The email address '{}' already exists. Please try logging in or make a new account",
+            email_id
+        ));
+    }
 
     // Hash the password
     let hashed_password = utils::password::hash_password(&password)
@@ -57,32 +91,46 @@ pub async fn sign_up(
     // Create a user in the database
     // Each user should have unique user_name which will be used as user_id
     // Checks for user exits will be made by the db engine itself
-    // Todo Think of adding check for unique email;
+
+    let new_user = models::user::UserCreation {
+        username: username.to_string(),
+        email_id: email_id.to_string(),
+        password: hashed_password,
+        age: body.age,
+        first_name: first_name.to_string(),
+        last_name: last_name.to_string(),
+        gender: gender.clone(),
+        is_admin: true,
+        is_verified: true,
+    };
+
+    // Create a new user
     let db_response: Result<Option<models::user::UserRecord>, surrealdb::Error> = db
         .create(("user", body.username.clone()))
-        .content(models::user::UserCreation {
-            username: username.to_string(),
-            email_id: email_id.to_string(),
-            password: hashed_password,
-            age: body.age,
-            first_name: first_name.to_string(),
-            last_name: last_name.to_string(),
-            gender: gender.clone(),
-            is_admin: true,
-            is_verified: true,
-        })
+        .content(new_user)
         .await;
 
+    // If no error send back the user
+    // to do make a custom response
     match db_response {
-        Ok(created_user) => {
-            dbg!("New User Created");
-            dbg!(&created_user);
-
-            match created_user {
-                Some(user) => HttpResponse::Created().json(user),
-                _ => return HttpResponse::Created().body("User created"),
+        Ok(created_user) => match created_user {
+            Some(user) => {
+                let res_user = route_sign_up::SignUpResponse {
+                    status: 201,
+                    message: "User Created",
+                    new_user: route_sign_up::UserResponse {
+                        username: &user.username,
+                        email_id: &user.email_id,
+                        first_name: &user.first_name,
+                        last_name: &user.last_name,
+                        age: user.age,
+                        gender: user.gender.clone(),
+                    },
+                };
+                HttpResponse::Created().json(res_user)
             }
-        }
+            _ => return HttpResponse::Created().body("User created"),
+        },
         Err(err) => match err {
             surrealdb::Error::Api(err) => HttpResponse::BadRequest().body(format!(
                 "User with username already exists..\nError: {}",
