@@ -1,6 +1,6 @@
-use crate::api;
-use std::sync::{Arc, Mutex};
-pub struct AppState {
-    pub app_name: String,
-    pub users: Arc<Mutex<Vec<api::user::User>>>,
+use surrealdb::{engine::remote::ws::Client, Surreal};
+
+use std::sync::Mutex;
+pub struct AppContext {
+    pub db: Mutex<Surreal<Client>>,
 }

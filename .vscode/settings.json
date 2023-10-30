@@ -2,4 +2,11 @@
   "search.exclude": {
   "**/target": true 
   },
+  "cSpell.words": [
+    "actix"
+  ],
+  "rust-analyzer.linkedProjects": [
+    ".\\Cargo.toml"
+  ],
+  "rust-analyzer.showUnlinkedFileNotification": false,
 }

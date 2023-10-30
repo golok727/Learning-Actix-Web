@@ -1,5 +1,11 @@
-use actix_web::{web, App, HttpServer};
-use std::sync::{Arc, Mutex};
+use actix_web::{middleware::Logger, web, App, HttpServer};
+use env_logger::Env;
+use std::sync::Mutex;
+
+use surrealdb::engine::remote::ws::Ws;
+use surrealdb::opt::auth::Root;
+use surrealdb::sql::Thing;
+use surrealdb::Surreal;
 
 mod api;
 
@@ -7,16 +13,46 @@ mod api;
 async fn main() -> std::io::Result<()> {
     println!("Radhey Shyam");
 
-    let state = web::Data::new(api::app_state::AppState {
-        app_name: String::from("Radha Krsna"),
-        users: Arc::new(Mutex::new(api::user::make_users())),
-    });
+    // Initialize Logger
+    env_logger::init_from_env(Env::default().default_filter_or("info"));
+
+    // Start Database
+    let db = Surreal::new::<Ws>("127.0.0.1:8000")
+        .await
+        .map_err(|err| println!("Error Connecting to DB...\n Error: {}", err))
+        .unwrap();
+
+    // Sign Into DataBase
+    // Todo use ENV variables
+    db.signin(Root {
+        username: "root",
+        password: "root",
+    })
+    .await
+    .map_err(|err| println!("Error Logging Into Database...\n Error: {}", err))
+    .unwrap();
+
+    // Choose namespace and database
+    db.use_ns("development")
+        .use_db("testing")
+        .await
+        .map_err(|err| println!("Database Connection Error: \n {}", err))
+        .unwrap();
+
+    println!("Using Surreal DB...: {:#?}", db.version());
+
+    // setup the database in the state
+    let ctx = web::Data::new(api::app_state::AppContext { db: Mutex::new(db) });
 
     HttpServer::new(move || {
+        let api_scope = web::scope("/api")
+            .service(api::routes::authentication::sign_in)
+            .service(api::routes::authentication::sign_up);
+
         App::new()
-            .app_data(state.clone())
-            .service(api::user::users_route)
-            .service(api::user::signup_route)
+            .wrap(Logger::default())
+            .app_data(ctx.clone())
+            .service(api_scope)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
