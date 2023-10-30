@@ -2576,6 +2576,7 @@ name = "rust_rest_api"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "argon2",
  "env_logger",
  "serde",
  "surrealdb",
