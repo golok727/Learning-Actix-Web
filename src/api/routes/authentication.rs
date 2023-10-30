@@ -105,10 +105,7 @@ pub async fn sign_up(
     };
 
     // Create a new user
-    let db_response: Result<Option<models::user::UserRecord>, surrealdb::Error> = db
-        .create(("user", body.username.clone()))
-        .content(new_user)
-        .await;
+    let db_response = models::user::UserRecord::create(&db, new_user).await;
 
     // If no error send back the user
     // to do make a custom response

@@ -53,6 +53,24 @@ pub mod user {
                 Ok(Some(entries[0].to_owned()))
             }
         }
-        pub async fn create(db: &Data<Surreal<Client>>) {}
+        pub async fn create(
+            db: &Data<Surreal<Client>>,
+            new_user: UserCreation,
+        ) -> Result<Option<UserRecord>, surrealdb::Error> {
+            let db_response: Result<Option<UserRecord>, surrealdb::Error> = db
+                .create(("user", new_user.username.clone()))
+                .content(new_user)
+                .await;
+            db_response
+        }
+        #[allow(dead_code)]
+        pub async fn get_all_users() {
+            // TODO:  TO IMPLEMENT}
+        }
+
+        #[allow(dead_code)]
+        pub async fn get_user_by_id() {
+            // todo:  to implement}
+        }
     }
 }
