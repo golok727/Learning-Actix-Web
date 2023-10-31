@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils;
 
-use super::models;
+use super::models::user;
 
 mod route_sign_in {
     #[derive(super::Serialize, super::Deserialize, Debug)]
@@ -65,11 +65,11 @@ mod route_sign_up {
 }
 
 #[post("/signin")]
-pub async fn sign_in(body: web::Json<route_sign_in::SignInBody>) -> HttpResponse {
+pub async fn sign_in(body: web::Json<route_sign_in::SignInBody>) -> Result<HttpResponse, AppError> {
     dbg!(body);
     // Allow to sign in with both username or email
 
-    HttpResponse::Ok().body("SignIn")
+    Ok(HttpResponse::Ok().body("SignIn"))
 }
 
 #[post("/signup")]
@@ -84,10 +84,10 @@ pub async fn sign_up(
     let password = &body.password;
     let first_name = &body.first_name;
     let last_name = &body.last_name;
-    let gender: &models::user::Gender = &body.gender;
+    let gender: &user::Gender = &body.gender;
 
     // check if email already exists;
-    let db_user = models::user::UserRecord::find_one_by_email(&db, email_id).await?;
+    let db_user = user::UserRecord::find_one_by_email(&db, email_id).await?;
 
     // Return bad request if the email already exists
     if Option::is_some(&db_user) {
@@ -96,14 +96,13 @@ pub async fn sign_up(
     }
 
     // Hash the password
-    let hashed_password = utils::password::hash_password(&password)
-        .map_err(|err| AppError::InternalServerError(Some(format!("{}", err))))?;
+    let hashed_password = utils::password::hash_password(&password)?;
 
     // Create a user in the database
     // Each user should have unique user_name which will be used as user_id
     // Checks for user exits will be made by the db engine itself
 
-    let new_user = models::user::UserCreation {
+    let new_user = user::UserCreation {
         username: username.to_string(),
         email_id: email_id.to_string(),
         password: hashed_password,
@@ -116,7 +115,7 @@ pub async fn sign_up(
     };
 
     // Create a new user
-    let created_user = models::user::UserRecord::create(&db, new_user).await?;
+    let created_user = user::UserRecord::create(&db, new_user).await?;
 
     // If no error send back the user
     // to do make a custom response

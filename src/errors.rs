@@ -24,6 +24,7 @@ pub enum AppError {
     DatabaseQueryError(Option<String>),
     DatabaseError(Option<String>),
     BadRequest(Option<String>),
+    HashError(Option<String>),
 }
 fn error_format<'a>(error_type: &'a str, message: Option<&'a str>) -> String {
     match message {
@@ -36,16 +37,20 @@ fn error_format<'a>(error_type: &'a str, message: Option<&'a str>) -> String {
 
 fn get_error_message(error: &AppError) -> String {
     match error {
+        //? With messages
+
         AppError::InternalServerError(Some(msg)) => error_format("InternalServerError", Some(msg)),
         AppError::DatabaseQueryError(Some(msg)) => error_format("DatabaseQueryError", Some(msg)),
         AppError::DatabaseError(Some(msg)) => error_format("DatabaseError", Some(msg)),
-
         AppError::BadRequest(Some(msg)) => error_format("DatabaseError", Some(msg)),
+        AppError::HashError(Some(msg)) => error_format("HashError", Some(msg)),
 
+        //? Without Message
         AppError::InternalServerError(None) => error_format("InternalServerError", None),
         AppError::DatabaseQueryError(None) => error_format("DatabaseQueryError", None),
         AppError::DatabaseError(None) => error_format("DatabaseError", None),
         AppError::BadRequest(None) => error_format("DatabaseError", None),
+        AppError::HashError(None) => error_format("HashError", None),
     }
 }
 
@@ -73,6 +78,9 @@ impl ResponseError for AppError {
 
             AppError::DatabaseError(None) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::DatabaseError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+
+            AppError::HashError(None) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::HashError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 
             AppError::BadRequest(None) => StatusCode::BAD_REQUEST,
             AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
