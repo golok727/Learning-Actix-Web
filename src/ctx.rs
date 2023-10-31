@@ -10,6 +10,6 @@ impl Context {
     pub fn get_db(&self) -> Result<MutexGuard<Surreal<Client>>, AppError> {
         self.db
             .lock()
-            .map_err(|_| AppError::InternalServerError(Some("Error Getting Database")))
+            .map_err(|_| AppError::InternalServerError(Some("Error Getting Database".to_owned())))
     }
 }

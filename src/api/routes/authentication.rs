@@ -1,4 +1,4 @@
-use crate::ctx::Context;
+use crate::{ctx::Context, errors::AppError};
 use actix_web::{post, web, web::Data, HttpResponse};
 use serde::{Deserialize, Serialize};
 
@@ -16,7 +16,7 @@ mod route_sign_in {
 }
 
 mod route_sign_up {
-    use crate::api::routes::models::user;
+    use crate::api::routes::models::user::{self, UserRecord};
 
     #[derive(super::Serialize, super::Deserialize, Debug)]
     pub struct SignUpBody {
@@ -45,6 +45,23 @@ mod route_sign_up {
         pub message: &'a str,
         pub new_user: UserResponse<'a>,
     }
+
+    impl<'a> SignUpResponse<'a> {
+        pub fn new(user: &'a UserRecord) -> Self {
+            Self {
+                status: 201,
+                message: "User Created",
+                new_user: UserResponse {
+                    username: &user.username,
+                    email_id: &user.email_id,
+                    first_name: &user.first_name,
+                    last_name: &user.last_name,
+                    age: user.age,
+                    gender: user.gender.clone(),
+                },
+            }
+        }
+    }
 }
 
 #[post("/signin")]
@@ -59,7 +76,7 @@ pub async fn sign_in(body: web::Json<route_sign_in::SignInBody>) -> HttpResponse
 pub async fn sign_up(
     body: web::Json<route_sign_up::SignUpBody>,
     ctx: Data<Context>,
-) -> HttpResponse {
+) -> Result<HttpResponse, AppError> {
     let db = ctx.get_db().unwrap();
 
     let username = &body.username;
@@ -70,25 +87,17 @@ pub async fn sign_up(
     let gender: &models::user::Gender = &body.gender;
 
     // check if email already exists;
-    let db_user = models::user::UserRecord::find_one_by_email(&db, email_id)
-        .await
-        .map_err(|err| {
-            HttpResponse::InternalServerError()
-                .body(format!("Something went wrong\n Error: {}", err))
-        })
-        .unwrap();
+    let db_user = models::user::UserRecord::find_one_by_email(&db, email_id).await?;
 
+    // Return bad request if the email already exists
     if Option::is_some(&db_user) {
-        return HttpResponse::BadRequest().body(format!(
-            "The email address '{}' already exists. Please try logging in or make a new account",
-            email_id
-        ));
+        let error_message = format!("The user with email '{}' already exists.", &email_id);
+        return Err(AppError::BadRequest(Some(error_message)));
     }
 
     // Hash the password
     let hashed_password = utils::password::hash_password(&password)
-        .map_err(|_| HttpResponse::InternalServerError().body(format!("Something Went Wrong!...")))
-        .unwrap();
+        .map_err(|err| AppError::InternalServerError(Some(format!("{}", err))))?;
 
     // Create a user in the database
     // Each user should have unique user_name which will be used as user_id
@@ -102,41 +111,23 @@ pub async fn sign_up(
         first_name: first_name.to_string(),
         last_name: last_name.to_string(),
         gender: gender.clone(),
-        is_admin: true,
-        is_verified: true,
+        is_admin: false,
+        is_verified: false,
     };
 
     // Create a new user
-    let db_response = models::user::UserRecord::create(&db, new_user).await;
+    let created_user = models::user::UserRecord::create(&db, new_user).await?;
 
     // If no error send back the user
     // to do make a custom response
-    match db_response {
-        Ok(created_user) => match created_user {
-            Some(user) => {
-                let res_user = route_sign_up::SignUpResponse {
-                    status: 201,
-                    message: "User Created",
-                    new_user: route_sign_up::UserResponse {
-                        username: &user.username,
-                        email_id: &user.email_id,
-                        first_name: &user.first_name,
-                        last_name: &user.last_name,
-                        age: user.age,
-                        gender: user.gender.clone(),
-                    },
-                };
-                HttpResponse::Created().json(res_user)
-            }
-            _ => return HttpResponse::Created().body("User created"),
-        },
-        Err(err) => match err {
-            surrealdb::Error::Api(err) => HttpResponse::BadRequest().body(format!(
-                "User with username already exists..\nError: {}",
-                &err
-            )),
-            _ => HttpResponse::InternalServerError()
-                .body(format!("Something Went Wrong!!!\nError: {}", err)),
-        },
+    match created_user {
+        Some(user) => {
+            let response = route_sign_up::SignUpResponse::new(&user);
+
+            Ok(HttpResponse::Created().json(response))
+        }
+        _ => Err(AppError::DatabaseError(Some(
+            "Something Went Wrong".to_owned(),
+        ))),
     }
 }

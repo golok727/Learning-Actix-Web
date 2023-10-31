@@ -14,7 +14,8 @@ pub mod password {
 
         Ok(password_hash)
     }
-    
+
+    #[allow(dead_code)]
     pub fn verify(password: &str, hash: &str) -> Result<bool, Box<dyn std::error::Error>> {
         let parsed_hash = PasswordHash::new(hash)?;
         let pass_bytes = password.as_bytes();

@@ -2,6 +2,8 @@ pub mod user {
     use serde::{Deserialize, Serialize};
     use surrealdb::{engine::remote::ws::Client, sql::Thing, Surreal};
 
+    use crate::errors::AppError;
+
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub enum Gender {
         Male,
@@ -37,15 +39,33 @@ pub mod user {
         pub is_verified: bool,
     }
     impl UserRecord {
-        pub async fn find_one_by_email(
-            db: &Surreal<Client>,
-            email_id: &str,
-        ) -> Result<Option<Self>, surrealdb::Error> {
+        pub async fn find_one_by_email<'a>(
+            db: &'a Surreal<Client>,
+            email_id: &'a str,
+        ) -> Result<Option<Self>, AppError> {
             let sql = "SELECT * FROM user WHERE email_id = $email";
 
-            let mut result = db.query(sql).bind(("email", email_id)).await?;
+            let mut result = db
+                .query(sql)
+                .bind(("email", email_id))
+                .await
+                .map_err(|err| {
+                    let error_message = format!("{}", err);
+                    AppError::DatabaseQueryError(Some(error_message));
+                })
+                .unwrap();
 
-            let entries: Vec<UserRecord> = result.take(0)?;
+            let entries: Vec<UserRecord> = result
+                .take(0)
+                .map_err(|err| {
+                    let error_message = format!(
+                        "Something Went Wrong While Getting Users By Email...\n{}",
+                        err
+                    );
+
+                    AppError::DatabaseError(Some(error_message));
+                })
+                .unwrap();
 
             if entries.is_empty() {
                 Ok(None)
@@ -56,12 +76,25 @@ pub mod user {
         pub async fn create(
             db: &Surreal<Client>,
             new_user: UserCreation,
-        ) -> Result<Option<UserRecord>, surrealdb::Error> {
+        ) -> Result<Option<UserRecord>, AppError> {
             let db_response: Result<Option<UserRecord>, surrealdb::Error> = db
                 .create(("user", new_user.username.clone()))
                 .content(new_user)
                 .await;
-            db_response
+            match db_response {
+                Ok(created) => Ok(created),
+                Err(err) => match err {
+                    surrealdb::Error::Api(err) => {
+                        let error_message =
+                            format!("User with username already exists..\nError: {}", &err);
+                        Err(AppError::BadRequest(Some(error_message)))
+                    }
+                    _ => {
+                        let error_message = format!("Something Went Wrong!!!\nError: {}", &err);
+                        Err(AppError::InternalServerError(Some(error_message)))
+                    }
+                },
+            }
         }
         #[allow(dead_code)]
         pub async fn get_all_users() {
