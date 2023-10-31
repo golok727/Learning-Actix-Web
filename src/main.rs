@@ -7,9 +7,9 @@ use surrealdb::Surreal;
 
 mod api;
 mod ctx;
+mod db;
 mod errors;
 mod utils;
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     println!("Radhey Shyam");

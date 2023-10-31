@@ -1,0 +1,20 @@
+#V2
+select * from user
+select * from user where id = 'radha_krsna'
+select * from user where id = 'user:radha_krsna'
+select * from user where id = 'user:radha_krsna' and email_id ='radha'
+select * from user where id = 'user:radha_krsna' and email_id ='radha_krsna@golok.vrindavan'
+select * from user
+select * from user where email_id = adihyan
+select * from user where id = 'user:radha_krsna' and email_id ='radha_krsna@golok.vrindavan'
+select * from user where email_id ='radha_krsna@golok.vrindavan'
+select * from user where email_id ='radha_krsna@golok.vrindavan' and id = hello
+select * from user where email_id ='radha_krsna@golok.vrindavan' and id = 'radha'
+select * from user where email_id ='radha_krsna@golok.vrindavan' and id = 'radha_krsna'
+select * from user where email_id ='radha_krsna@golok.vrindavan' and id = 'user:radha_krsna'
+select * from user where id == radha_krsna
+select * from user where id == 'user:radha_krsna'
+select * from user where id == 'user:radha_krsna' and email == 'radha'
+select * from user where id == 'user:radha_krsna' and email == 'radha_krsna@golok.vrindavan'
+select * from user where id == 'user:radha_krsna' and email_id == 'radha_krsna@golok.vrindavan'
+exit

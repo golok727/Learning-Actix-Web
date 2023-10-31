@@ -1,12 +1,14 @@
-use crate::{ctx::Context, errors::AppError};
+use crate::{ctx::Context, db, errors::AppError};
 use actix_web::{post, web, web::Data, HttpResponse};
 use serde::{Deserialize, Serialize};
+use surrealdb::sql::Thing;
 
 use crate::utils;
 
 use super::models::user;
 
 mod route_sign_in {
+
     #[derive(super::Serialize, super::Deserialize, Debug)]
     pub struct SignInBody {
         pub email_id: Option<String>,
@@ -63,12 +65,13 @@ mod route_sign_up {
         }
     }
 }
-
 #[post("/signin")]
-pub async fn sign_in(body: web::Json<route_sign_in::SignInBody>) -> Result<HttpResponse, AppError> {
+pub async fn sign_in(
+    body: web::Json<route_sign_in::SignInBody>,
+    _ctx: Data<Context>,
+) -> Result<HttpResponse, AppError> {
     dbg!(body);
     // Allow to sign in with both username or email
-
     Ok(HttpResponse::Ok().body("SignIn"))
 }
 
@@ -77,7 +80,7 @@ pub async fn sign_up(
     body: web::Json<route_sign_up::SignUpBody>,
     ctx: Data<Context>,
 ) -> Result<HttpResponse, AppError> {
-    let db = ctx.get_db().unwrap();
+    let db = ctx.get_db()?;
 
     let username = &body.username;
     let email_id = &body.email_id;
@@ -87,11 +90,25 @@ pub async fn sign_up(
     let gender: &user::Gender = &body.gender;
 
     // check if email already exists;
-    let db_user = user::UserRecord::find_one_by_email(&db, email_id).await?;
+    let db_user = user::UserRecord::find_one_if(
+        &db,
+        "id == $id or email_id == $email".to_owned(),
+        db::Select::WhereIdAndEmail {
+            id: Thing {
+                tb: "user".to_owned(),
+                id: username.clone().into(),
+            },
+            email: &email_id,
+        },
+    )
+    .await?;
 
     // Return bad request if the email already exists
     if Option::is_some(&db_user) {
-        let error_message = format!("The user with email '{}' already exists.", &email_id);
+        let error_message = format!(
+            "The user with email '{}' or id {} already exists.",
+            &email_id, &username
+        );
         return Err(AppError::BadRequest(Some(error_message)));
     }
 
@@ -100,8 +117,7 @@ pub async fn sign_up(
 
     // Create a user in the database
     // Each user should have unique user_name which will be used as user_id
-    // Checks for user exits will be made by the db engine itself
-
+    // Checks for user_id exits will be made by the db engine itself
     let new_user = user::UserCreation {
         username: username.to_string(),
         email_id: email_id.to_string(),
