@@ -1,11 +1,13 @@
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use env_logger::Env;
-
+use std::sync::Mutex;
 use surrealdb::engine::remote::ws::Ws;
 use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
 
 mod api;
+mod ctx;
+mod errors;
 mod utils;
 
 #[actix_web::main]
@@ -39,6 +41,7 @@ async fn main() -> std::io::Result<()> {
 
     // setup the database in the state
 
+    let application_context = web::Data::new(ctx::Context { db: Mutex::new(db) });
     HttpServer::new(move || {
         let api_scope = web::scope("/api")
             .service(api::routes::authentication::sign_in)
@@ -46,7 +49,7 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .wrap(Logger::default())
-            .app_data(web::Data::new(db.clone()))
+            .app_data(application_context.clone())
             .service(api_scope)
     })
     .bind(("127.0.0.1", 8080))?

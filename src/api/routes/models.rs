@@ -1,5 +1,4 @@
 pub mod user {
-    use actix_web::web::Data;
     use serde::{Deserialize, Serialize};
     use surrealdb::{engine::remote::ws::Client, sql::Thing, Surreal};
 
@@ -39,10 +38,11 @@ pub mod user {
     }
     impl UserRecord {
         pub async fn find_one_by_email(
-            db: &Data<Surreal<Client>>,
+            db: &Surreal<Client>,
             email_id: &str,
         ) -> Result<Option<Self>, surrealdb::Error> {
             let sql = "SELECT * FROM user WHERE email_id = $email";
+
             let mut result = db.query(sql).bind(("email", email_id)).await?;
 
             let entries: Vec<UserRecord> = result.take(0)?;
@@ -54,7 +54,7 @@ pub mod user {
             }
         }
         pub async fn create(
-            db: &Data<Surreal<Client>>,
+            db: &Surreal<Client>,
             new_user: UserCreation,
         ) -> Result<Option<UserRecord>, surrealdb::Error> {
             let db_response: Result<Option<UserRecord>, surrealdb::Error> = db

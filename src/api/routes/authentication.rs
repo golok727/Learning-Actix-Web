@@ -1,6 +1,6 @@
-use actix_web::{post, web, HttpResponse};
+use crate::ctx::Context;
+use actix_web::{post, web, web::Data, HttpResponse};
 use serde::{Deserialize, Serialize};
-use surrealdb::{engine::remote::ws::Client, Surreal};
 
 use crate::utils;
 
@@ -58,8 +58,10 @@ pub async fn sign_in(body: web::Json<route_sign_in::SignInBody>) -> HttpResponse
 #[post("/signup")]
 pub async fn sign_up(
     body: web::Json<route_sign_up::SignUpBody>,
-    db: web::Data<Surreal<Client>>,
+    ctx: Data<Context>,
 ) -> HttpResponse {
+    let db = ctx.get_db().unwrap();
+
     let username = &body.username;
     let email_id = &body.email_id;
     let password = &body.password;
