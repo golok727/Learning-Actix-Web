@@ -40,38 +40,6 @@ pub mod user {
         pub is_verified: bool,
     }
     impl UserRecord {
-        pub async fn find_one_if<'a>(
-            db: &'a Surreal<Client>,
-            condition: String,
-            args: impl Serialize,
-        ) -> Result<Option<UserRecord>, AppError> {
-            let sql = format!("SELECT * FROM user WHERE {};", &condition);
-            dbg!(&sql);
-            let result = db.query(sql).bind(args);
-
-            let mut response = result
-                .await
-                .map_err(|err| {
-                    let error_message = format!("{}", err);
-                    AppError::DatabaseQueryError(Some(error_message));
-                })
-                .unwrap();
-
-            let entries: Vec<UserRecord> = response
-                .take(0)
-                .map_err(|err| {
-                    let error_message = format!("{}", err);
-                    AppError::DatabaseError(Some(error_message));
-                })
-                .unwrap();
-
-            if entries.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(entries[0].to_owned()))
-            }
-        }
-
         #[allow(dead_code)]
         pub async fn find_one_by_email<'a>(
             db: &'a Surreal<Client>,

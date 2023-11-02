@@ -1,8 +1,11 @@
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use env_logger::Env;
+use serde::de::IntoDeserializer;
+use std::collections::BTreeMap;
 use std::sync::Mutex;
 use surrealdb::engine::remote::ws::Ws;
 use surrealdb::opt::auth::Root;
+use surrealdb::sql::{thing, Value};
 use surrealdb::Surreal;
 
 mod api;
@@ -40,6 +43,14 @@ async fn main() -> std::io::Result<()> {
         .unwrap();
 
     // setup the database in the state
+
+    let q = "SELECT * FROM user WHERE id=$id";
+    let id = thing("user:radha_krsna").unwrap();
+    let vars: BTreeMap<String, Value> = BTreeMap::from([("id".into(), id.into())]);
+
+    let response = db.query(q).bind(vars).await.unwrap();
+
+    dbg!(response);
 
     let application_context = web::Data::new(ctx::Context { db: Mutex::new(db) });
     HttpServer::new(move || {

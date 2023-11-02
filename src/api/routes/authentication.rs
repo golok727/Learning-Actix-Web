@@ -1,7 +1,6 @@
-use crate::{ctx::Context, db, errors::AppError};
+use crate::{ctx::Context, errors::AppError};
 use actix_web::{post, web, web::Data, HttpResponse};
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::Thing;
 
 use crate::utils;
 
@@ -67,11 +66,11 @@ mod route_sign_up {
 }
 #[post("/signin")]
 pub async fn sign_in(
-    body: web::Json<route_sign_in::SignInBody>,
+    _body: web::Json<route_sign_in::SignInBody>,
     _ctx: Data<Context>,
 ) -> Result<HttpResponse, AppError> {
-    dbg!(body);
     // Allow to sign in with both username or email
+
     Ok(HttpResponse::Ok().body("SignIn"))
 }
 
@@ -90,18 +89,7 @@ pub async fn sign_up(
     let gender: &user::Gender = &body.gender;
 
     // check if email already exists;
-    let db_user = user::UserRecord::find_one_if(
-        &db,
-        "id == $id or email_id == $email".to_owned(),
-        db::Select::WhereIdAndEmail {
-            id: Thing {
-                tb: "user".to_owned(),
-                id: username.clone().into(),
-            },
-            email: &email_id,
-        },
-    )
-    .await?;
+    let db_user = user::UserRecord::find_one_by_email(&db, &email_id).await?;
 
     // Return bad request if the email already exists
     if Option::is_some(&db_user) {
