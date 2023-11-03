@@ -3,7 +3,7 @@ pub mod user {
 
     use surrealdb::{engine::remote::ws::Client, sql::Thing, Surreal};
 
-    use crate::errors::AppError;
+    use crate::{errors::AppError, Wrap};
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub enum Gender {
@@ -47,27 +47,9 @@ pub mod user {
         ) -> Result<Option<Self>, AppError> {
             let sql = "SELECT * FROM user WHERE email_id = $email";
 
-            let mut result = db
-                .query(sql)
-                .bind(("email", email_id))
-                .await
-                .map_err(|err| {
-                    let error_message = format!("{}", err);
-                    AppError::DatabaseQueryError(Some(error_message));
-                })
-                .unwrap();
+            let mut result = Wrap!(db.query(sql).bind(("email", email_id)).await)?;
 
-            let entries: Vec<UserRecord> = result
-                .take(0)
-                .map_err(|err| {
-                    let error_message = format!(
-                        "Something Went Wrong While Getting Users By Email...\n{}",
-                        err
-                    );
-
-                    AppError::DatabaseError(Some(error_message));
-                })
-                .unwrap();
+            let entries: Vec<UserRecord> = Wrap!(result.take(0))?;
 
             if entries.is_empty() {
                 Ok(None)
@@ -83,6 +65,7 @@ pub mod user {
                 .create(("user", new_user.username.clone()))
                 .content(new_user)
                 .await;
+
             match db_response {
                 Ok(created) => Ok(created),
                 Err(err) => match err {

@@ -1,6 +1,7 @@
+use crate::api::routes::models::user::UserRecord;
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use env_logger::Env;
-use serde::de::IntoDeserializer;
+use errors::AppError;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 use surrealdb::engine::remote::ws::Ws;
@@ -13,6 +14,7 @@ mod ctx;
 mod db;
 mod errors;
 mod utils;
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     println!("Radhey Shyam");
@@ -44,12 +46,19 @@ async fn main() -> std::io::Result<()> {
 
     // setup the database in the state
 
-    let q = "SELECT * FROM user WHERE id=$id";
-    let id = thing("user:radha_krsna").unwrap();
-    let vars: BTreeMap<String, Value> = BTreeMap::from([("id".into(), id.into())]);
+    let q = "SELECT * FROM user WHERE id=$id AND email_id=$email";
+    let id = Wrap!(thing("user:radha_krsna")).unwrap();
+    let email = "radha_krsna@golok.vrindavan";
 
-    let response = db.query(q).bind(vars).await.unwrap();
+    let vars: BTreeMap<String, Value> =
+        BTreeMap::from([("id".into(), id.into()), ("email".into(), email.into())]);
 
+    let mut response = Wrap!(db.query(q).bind(vars).await).unwrap();
+    let user = Wrap!(response.take::<Option<UserRecord>>(0)).unwrap();
+
+    if let Some(user) = user {
+        dbg!(user);
+    }
     dbg!(response);
 
     let application_context = web::Data::new(ctx::Context { db: Mutex::new(db) });

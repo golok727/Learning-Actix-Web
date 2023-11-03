@@ -24,7 +24,7 @@ pub mod password {
     pub fn verify(password: &str, hash: &str) -> Result<bool, AppError> {
         let parsed_hash =
             PasswordHash::new(hash).map_err(|err| AppError::HashError(Some(format!("{}", err))))?;
-            
+
         let pass_bytes = password.as_bytes();
 
         let matched = Argon2::default()
